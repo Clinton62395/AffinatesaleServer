@@ -8,6 +8,11 @@ import {
   withdrawalPinUpdate,
 } from "../controllers/bankDetails.controller.js";
 import { userComment } from "../controllers/review.controller.js";
+import {
+  resetPassword,
+  updatePassword,
+} from "../controllers/password.controller.js";
+import { upload, uploadFile } from "../controllers/uploadfile.controller.js";
 // Main route
 const router = express.Router();
 
@@ -28,5 +33,13 @@ router.patch("/withdrawal-pin", verifyToken, withdrawalPinUpdate);
 // review for  users comment  controller
 
 router.post("/classroom-review/:courseId", verifyToken, userComment);
+
+// reset password route
+router.post("/reset-password", resetPassword);
+
+// update passord route
+
+router.post("/update-password", updatePassword);
+router.post("/upload-file", upload.single("file"), uploadFile);
 
 export default router;

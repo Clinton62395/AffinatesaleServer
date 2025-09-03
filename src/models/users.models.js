@@ -17,7 +17,16 @@ const userSchema = new Schema(
 
     phoneNumber: { type: String, required: true },
 
-    password: { type: String, required: true, trim: true },
+    password: {
+      type: String,
+      required: true,
+      trim: true,
+      minLength: [5, "password cannot be less than 5 characters"],
+      maxLength: [100, "password cannot be more than 100 characters"],
+    },
+
+    resetpasswordToken: { type: String },
+    resetpasswordExpiresToken: { type: Date },
 
     referralCode: { type: String, required: true, trim: true },
 
@@ -57,11 +66,6 @@ const userSchema = new Schema(
       bank: { type: String },
     },
     // user password updates
-    userPassword: {
-      currentPassword: { type: String },
-      newPassword: { type: String },
-      newPasswordAgain: { type: String },
-    },
 
     // Withdrawal Settings
     withdrawalSettings: {
