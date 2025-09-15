@@ -2,6 +2,7 @@ import User from "../models/users.models.js";
 import jwt from "jsonwebtoken";
 import dotenv from "dotenv";
 import bcrypt from "bcrypt";
+import crypto from "crypto";
 import { transporter } from "../config/mailer.js";
 dotenv.config();
 export const resetPassword = async (req, res) => {
@@ -12,36 +13,28 @@ export const resetPassword = async (req, res) => {
         .status(400)
         .send({ success: false, message: "user email is required " });
     }
-    const user = await User.findOne({ email });
-    if (!user) {
-      return res
-        .status(404)
-        .send({ success: false, message: "user not found" });
-    }
+
+    const resetToken = crypto.randomBytes(30).toString("hex");
+    const hashToken = await bcrypt.hash(resetToken, 10);
+
+    const user = await User.findOneAndUpdate(
+      { email: email },
+      {
+        resetpasswordToken: hashToken,
+        resetpasswordExpiresToken: Date.now() + 15 * 60 * 1000,
+      }
+    );
 
     // reset pssword token
 
-    const resetToken = jwt.sign(
-      {
-        userId: user._id,
-      },
-      process.env.JWT_SECRET,
-      { expiresIn: "15m" }
-    );
-    const hashToken = await bcrypt.hash(resetToken, 10);
-    user.resetpasswordToken = hashToken;
-
-    user.resetpasswordExpiresToken = Date.now() + 15 * 60 * 1000;
-    await user.save();
-
-    const resetLink = `http://localhost:8800/reset-password?token=${resetToken}&id=${user._id}`;
+    const resetLink = `http://localhost:5173/auth/reset-password?token=${resetToken}&id=${user._id}`;
     await transporter.sendMail({
       from: '"Support App" <support@app.com>',
       to: email,
-      subject: "Réinitialisation de mot de passe",
-      text: `Clique ici pour réinitialiser ton mot de passe: ${resetLink}`,
-      html: `<p>Clique ici pour réinitialiser ton mot de passe: 
-              <a href="${resetLink}">Réinitialiser</a></p>`,
+      subject: "Reset password",
+      text: `click here to update your password: ${resetLink} /n Note, the reset password will be expired after 15 minutes.`,
+      html: `<p>click here to update your password: 
+              <a href="${resetLink}">Update password</a> <br/> Note the reset password will be expired after 15 minutes.</p>`,
     });
 
     res
@@ -58,65 +51,59 @@ export const resetPassword = async (req, res) => {
 
 export const updatePassword = async (req, res) => {
   try {
-    const { newPassword, token } = req.body;
+    // const { id } = req.params;
+    const { newPassword, token, id } = req.body;
+    console.log("newpasse password", newPassword ? "here" : "absent");
+    console.log("token ", token ? "here" : "absent");
+    console.log("req. body ", req.body);
 
-    if (!newPassword || !token) {
-      return res
-        .status(400)
-        .send({ success: false, message: "new password and token is required" });
+    if (!newPassword || !token || !id) {
+      console.log("password, ", !!newPassword || !!token);
+      return res.status(400).send({
+        success: false,
+        message: "new password and token is required",
+      });
     }
 
-    const jwtToken = token.split("&")[0];
-
-    let decodedToken;
-
-    try {
-      decodedToken = jwt.verify(jwtToken, process.env.JWT_SECRET);
-      if (!decodedToken) {
-        return res
-          .status(400)
-          .send({ success: false, message: "token not valid or expired" });
-      }
-    } catch (error) {
-      console.error("token error");
-      return res
-        .status(400)
-        .send({ success: false, message: "token invalid or expired" });
-    }
-
-    const user = await User.findById(decodedToken.userId);
+    const user = await User.findOne({
+      _id: id,
+      resetpasswordExpiresToken: { $gt: Date.now() },
+    });
 
     if (!user) {
-      return res
-        .status(404)
-        .send({ success: false, message: "user not found" });
+      return res.status(404).send({
+        success: false,
+        message: "user not found or token has expired",
+      });
     }
 
-    const isTokenMatch = await bcrypt.compare(
-      jwtToken,
-      user.resetpasswordToken
-    );
+    const isTokenMatch = await bcrypt.compare(token, user.resetpasswordToken);
     if (!isTokenMatch) {
       return res.status(400).send({ success: false, message: "invalid token" });
     }
 
-    if (user.resetpasswordExpiresToken < Date.now()) {
-      return res
-        .status(400)
-        .send({ success: false, message: " token has expired" });
+    const updateUser = await User.findOneAndUpdate(
+      {
+        _id: id,
+        resetpasswordExpiresToken: { $gt: Date.now() },
+      },
+      {
+        password: newPassword,
+        resetpasswordExpiresToken: "",
+        resetpasswordToken: "",
+      },
+      { new: true, runValidators: true }
+    );
+    if (!updateUser) {
+      return res.status(400).send({
+        success: false,
+        message: "token has been used during process or token has expired",
+      });
     }
-
-    const hashNewPassword = await bcrypt.hash(newPassword, 10);
-
-    user.password = hashNewPassword;
-    user.resetpasswordExpiresToken = undefined;
-    user.resetpasswordToken = undefined;
-
-    await user.save();
 
     res.status(200).json({
       success: true,
-      message: "Mot de passe mis à jour avec succès.",
+      message: "password updated successfully.",
     });
   } catch (error) {
     console.error("internal server error", error.message);
@@ -131,6 +118,7 @@ export const updatePassword = async (req, res) => {
         .status(400)
         .send({ success: false, message: "validation error" });
     }
+
     return res.status(500).send({ success: false, message: "server error" });
   }
 };

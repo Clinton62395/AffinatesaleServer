@@ -1,5 +1,7 @@
 import mongoose, { Schema, model } from "mongoose";
 import bcrypt from "bcrypt";
+import crypto from "crypto";
+import { Base_Url } from "../utils/constant.utils.js";
 
 const userSchema = new Schema(
   {
@@ -28,15 +30,20 @@ const userSchema = new Schema(
     resetpasswordToken: { type: String },
     resetpasswordExpiresToken: { type: Date },
 
-    referralCode: { type: String, required: true, trim: true },
+    referralCode: { type: String, trim: true },
 
     country: { type: String, required: true, trim: true },
     rank: {
       type: String,
       enum: ["Beginner", "Intermediate", "Expert"],
+      default: "Beginner",
     },
 
     availableBalance: {
+      type: Number,
+      default: 0,
+    },
+    totalEarning: {
       type: Number,
       default: 0,
     },
@@ -51,16 +58,29 @@ const userSchema = new Schema(
       default: 0,
     },
 
-    affliateLink: {
+    affiliateLink: {
       type: String,
       unique: true,
     },
     image: {
       type: String,
     },
+
+    bank: {
+      orangeMoney: { type: String },
+      opay: { type: String },
+      mobileMoney: { type: String },
+    },
+
+    currency: {
+      type: String,
+      enum: ["USD", "NGN"], // tu peux ajouter d'autres devises ici
+      default: "USD",
+    },
+
     // user bank infomation
 
-    bankDatails: {
+    bankDetails: {
       accountname: { type: String },
       accountNo: { type: Number, default: 0 },
       bank: { type: String },
@@ -79,21 +99,29 @@ const userSchema = new Schema(
 // hash withdrawal  password pin before adding to database
 
 userSchema.pre("save", async function (next) {
-  try {
+  if (this.isModified("password")) {
     const salt = await bcrypt.genSalt(10);
-
-    if (this.isModified("password")) {
-      this.password = await bcrypt.hash(this.password, salt);
-    }
-
-    if (this.isModified("withdrawalPin")) {
-      this.withdrawalPin = await bcrypt.hash(String(this.withdrawalPin), salt);
-    }
-
-    next();
-  } catch (error) {
-    next(error);
+    this.password = await bcrypt.hash(this.password, salt);
   }
+
+  if (this.isModified("withdrawalPin")) {
+    const pinkSalt = await bcrypt.genSalt(12);
+    this.withdrawalPin = await bcrypt.hash(
+      String(this.withdrawalPin),
+      pinkSalt
+    );
+  }
+  next();
+});
+
+userSchema.pre("save", function (next) {
+  if (!this.referralCode) {
+    this.referralCode = crypto.randomUUID().split("-")[0];
+  }
+  if (!this.affiliateLink) {
+    this.affiliateLink = `${Base_Url}register?ref=${this.referralCode}`;
+  }
+  next();
 });
 
 const User = model("User", userSchema);

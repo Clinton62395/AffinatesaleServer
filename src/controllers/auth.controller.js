@@ -5,6 +5,7 @@ import dotenv from "dotenv";
 import admin from "firebase-admin";
 
 import serviceAccount from "../config/serviceAccountKey.json" with { type: "json" };
+import { refreshToken } from "firebase-admin/app";
 if (!admin.apps.length) {
   admin.initializeApp({
     credential: admin.credential.cert(serviceAccount),
@@ -55,10 +56,15 @@ export const socialRegister = async (req, res) => {
 
     // jwt
 
-    const userToken = jwt.sign(
+    const acess_token = jwt.sign(
       { userId: user._id, email: user.email },
       process.env.JWT_SECRET,
       { expiresIn: "2h" }
+    );
+    const refresh_token = jwt.sign(
+      { userId: user._id, email: user.email },
+      process.env.JWT_REFRESH_SECRET,
+      { expiresIn: "1d" }
     );
 
     res.status(200).send({
@@ -70,7 +76,8 @@ export const socialRegister = async (req, res) => {
         name: user.name,
         picture: user.picture,
       },
-      token: userToken,
+      accessToken: acess_token,
+      refreshtoken: refresh_token,
     });
   } catch (error) {
     console.error("social register error ", error);
@@ -85,18 +92,21 @@ export const register = async (req, res) => {
   try {
     const data = req.body;
 
-    if (
-      !data.firstName ||
-      !data.lastName ||
-      !data.phoneNumber ||
-      !data.referralCode ||
-      !data.password ||
-      !data.email ||
-      !data.country
-    ) {
-      return res
-        .status(400)
-        .send({ success: false, message: "All fields are required" });
+    const requiredFields = [
+      "firstName",
+      "lastName",
+      "phoneNumber",
+      "password",
+      "email",
+      "country",
+    ];
+
+    for (const field of requiredFields) {
+      if (!data[field]) {
+        return res
+          .status(400)
+          .send({ success: false, message: `${field} is required` });
+      }
     }
 
     const existingUser = await User.findOne({
@@ -110,8 +120,6 @@ export const register = async (req, res) => {
       });
     }
 
-    const affliateLink = `https://affinatesales/users/${data.referralCode}`;
-
     //  Create the new user
     const newUser = await User.create({
       firstName: data.firstName,
@@ -121,21 +129,27 @@ export const register = async (req, res) => {
       referralCode: data.referralCode,
       country: data.country,
       password: data.password,
-      affliateLink,
     });
 
     // JWT token for the new user
-    const userToken = jwt.sign(
+    const acess_token = jwt.sign(
       { email: newUser.email, userId: newUser._id },
       process.env.JWT_SECRET,
       { expiresIn: "2h" }
+    );
+
+    const refresh_token = jwt.sign(
+      { email: newUser.email, userId: newUser._id },
+      process.env.JWT_REFRESH_SECRET,
+      { expiresIn: "1d" }
     );
 
     res.status(201).send({
       success: true,
       message: "User has been created successfully",
       user: newUser,
-      userToken,
+      accessToken: acess_token,
+      refreshToken: refresh_token,
     });
   } catch (error) {
     console.error("Internal server error:", error);
@@ -149,6 +163,9 @@ export const register = async (req, res) => {
 export const userLogin = async (req, res) => {
   try {
     const { email, password } = req.body;
+
+    console.log("password error message", password);
+    console.log("full information of request", req.body);
 
     if (!email || !password) {
       return res.status(400).send({
@@ -171,16 +188,22 @@ export const userLogin = async (req, res) => {
         .send({ success: false, message: "Invalid password" });
     }
 
-    const token = jwt.sign(
+    const acess_token = jwt.sign(
       { userId: user._id, email: user.email },
       process.env.JWT_SECRET,
       { expiresIn: "2h" }
+    );
+    const refresh_token = jwt.sign(
+      { email: user.email, userId: user._id },
+      process.env.JWT_REFRESH_SECRET,
+      { expiresIn: "1d" }
     );
 
     res.status(200).send({
       success: true,
       message: "Login successful",
-      token,
+      accessToken: acess_token,
+      refreshToken: refresh_token,
       user: {
         _id: user._id,
         firstName: user.firstName,
@@ -191,5 +214,39 @@ export const userLogin = async (req, res) => {
   } catch (error) {
     console.error("Server error:", error);
     return res.status(500).send({ success: false, message: "Server error" });
+  }
+};
+
+// create new refresh token for user
+
+export const refreshTokenController = async (req, res) => {
+  const { refreshToken } = req.body;
+
+  if (!refreshToken) {
+    return res
+      .status(400)
+      .send({ success: false, message: "refresh token is required" });
+  }
+  try {
+    const refresh_Token = process.env.JWT_REFRESH_SECRET;
+    const JWT_SECRET = process.env.JWT_SECRET;
+
+    const decodedToken = jwt.verify(refreshToken, refresh_Token);
+
+    const newAccessToken = jwt.sign(
+      { userId: decodedToken.userId, email: decodedToken.email },
+      JWT_SECRET,
+      { expiresIn: "1h" }
+    );
+
+    res.status(200).send({
+      success: true,
+      message: "new refresh token created successfully",
+      accessToken: newAccessToken,
+    });
+    // const newRefreshToken=
+  } catch (error) {
+    console.error("error when creating token", error);
+    res.status(403).send({ success: false, message: "invalid token" });
   }
 };
