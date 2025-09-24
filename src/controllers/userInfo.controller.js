@@ -10,10 +10,11 @@ export const fetchDashboardStistics = async (req, res) => {
       });
     }
     console.log("user id ", userId);
+    // const user = await User.findById(userId);
 
     const user = await User.findById(userId)
       .select(
-        "firstName lastName  email rank  referralCode availableBalance payouts image totalEarning totalRefferal affiliateLink bankDetails bank currency  country withdrawalSettings phoneNumber"
+        "firstName lastName   email rank  referralCode availableBalance payouts image totalEarning totalRefferal affiliateLink bankDetails bank currency  country withdrawalSettings phoneNumber"
       )
       .lean();
     console.log("data fetch ", user);
@@ -23,10 +24,12 @@ export const fetchDashboardStistics = async (req, res) => {
         .send({ success: false, message: "user not found" });
     }
 
+    const withdrawalPin = !!user.withdrawalSettings?.withdrawalPin || null;
+
     res.status(200).json({
       success: true,
       message: "Dashboard data fetched successfully",
-      data: user, // Send the found user object
+      data: { ...user, hasPin: withdrawalPin }, // Send the found user object
     });
   } catch (err) {
     console.error("error occured when fetching user details", err);

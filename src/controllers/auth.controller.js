@@ -3,6 +3,7 @@ import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
 import dotenv from "dotenv";
 import admin from "firebase-admin";
+import crypto from "crypto";
 
 import serviceAccount from "../config/serviceAccountKey.json" with { type: "json" };
 import { refreshToken } from "firebase-admin/app";
@@ -89,9 +90,10 @@ export const socialRegister = async (req, res) => {
 
 // Register controller
 export const register = async (req, res) => {
+  const FRONTEND_URL = process.env.FORM_URL;
   try {
     const data = req.body;
-
+    console.log("data from user", data);
     const requiredFields = [
       "firstName",
       "lastName",
@@ -120,17 +122,37 @@ export const register = async (req, res) => {
       });
     }
 
+    let usedReferralCode = null;
+    if (data.referralCode) {
+      const refOwnerCode = await User.findOne({
+        referralCode: data.referralCode,
+      });
+      console.log("ref owner code", refOwnerCode);
+      if (refOwnerCode) {
+        refOwnerCode.availableBalance += 2;
+        refOwnerCode.totalRefferal += 1;
+        const result = await refOwnerCode.save();
+        console.log("ref owner code updated", result);
+        usedReferralCode = data.referralCode;
+      }
+    }
+
     //  Create the new user
     const newUser = await User.create({
       firstName: data.firstName,
       lastName: data.lastName,
       phoneNumber: data.phoneNumber,
       email: data.email.toLowerCase(),
-      referralCode: data.referralCode,
       country: data.country,
       password: data.password,
+      usedReferralCode: usedReferralCode,
+      referralCode: crypto.randomUUID().split("-")[0],
     });
 
+    // refferal link
+    newUser.affiliateLink = `${FRONTEND_URL}?ref=${newUser.referralCode}`;
+
+    await newUser.save();
     // JWT token for the new user
     const acess_token = jwt.sign(
       { email: newUser.email, userId: newUser._id },
@@ -141,7 +163,7 @@ export const register = async (req, res) => {
     const refresh_token = jwt.sign(
       { email: newUser.email, userId: newUser._id },
       process.env.JWT_REFRESH_SECRET,
-      { expiresIn: "1d" }
+      { expiresIn: "7d" }
     );
 
     res.status(201).send({
@@ -196,7 +218,7 @@ export const userLogin = async (req, res) => {
     const refresh_token = jwt.sign(
       { email: user.email, userId: user._id },
       process.env.JWT_REFRESH_SECRET,
-      { expiresIn: "1d" }
+      { expiresIn: "7d" }
     );
 
     res.status(200).send({
@@ -249,4 +271,9 @@ export const refreshTokenController = async (req, res) => {
     console.error("error when creating token", error);
     res.status(403).send({ success: false, message: "invalid token" });
   }
+};
+
+export const TestLogin = (req, res) => {
+  const { name, age } = req.body;
+  return res.status(200).send({ message: "Success", data: { name, age } });
 };

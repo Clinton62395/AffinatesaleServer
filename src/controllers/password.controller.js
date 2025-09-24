@@ -122,3 +122,70 @@ export const updatePassword = async (req, res) => {
     return res.status(500).send({ success: false, message: "server error" });
   }
 };
+
+// update password controller in the dashboard
+
+export const changePasswordDashboard = async (req, res) => {
+  try {
+    const { userId } = req.user;
+    const data = req.body;
+
+    const requiredFields = [
+      "currentPassword",
+      "newPassword",
+      "newPasswordAgain",
+    ];
+
+    for (const field of requiredFields) {
+      if (!data[field]) {
+        return res
+          .status(400)
+          .send({ success: false, message: `${field} is required` });
+      }
+    }
+
+    if (data.newPassword !== data.newPasswordAgain) {
+      return res
+        .status(401)
+        .send({ success: false, message: "passwords do not match" });
+    }
+    if (data.newPassword.length < 5 || data.newPassword.length > 15)
+      return res.status(401).send({
+        success: false,
+        message:
+          "password cannot be less than 5 characters and more than 15 characters",
+      });
+
+    const user = await User.findById(userId);
+    if (!user) {
+      return res
+        .status(404)
+        .send({ success: false, message: "user not found" });
+    }
+
+    const isPasswordMatch = await bcrypt.compare(
+      data.currentPassword,
+      user.password
+    );
+
+    if (!isPasswordMatch) {
+      return res
+        .status(401)
+        .send({ success: false, message: "Invalid current password" });
+    }
+
+    user.password = data.newPassword;
+    console.log("new password before saving ===>", data.newPassword);
+    await user.save();
+
+    res.status(200).send({
+      success: true,
+      message: "Password updated successfully",
+    });
+  } catch (error) {
+    console.error("Error changing password:", error);
+    return res
+      .status(500)
+      .send({ success: false, message: "Internal Server Error" });
+  }
+};

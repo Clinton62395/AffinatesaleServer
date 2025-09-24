@@ -31,7 +31,6 @@ const userSchema = new Schema(
     resetpasswordExpiresToken: { type: Date },
 
     referralCode: { type: String, trim: true },
-
     country: { type: String, required: true, trim: true },
     rank: {
       type: String,
@@ -56,6 +55,10 @@ const userSchema = new Schema(
     totalRefferal: {
       type: Number,
       default: 0,
+    },
+    usedReferralCode: {
+      type: String,
+      default: null,
     },
 
     affiliateLink: {
@@ -82,7 +85,10 @@ const userSchema = new Schema(
 
     bankDetails: {
       accountname: { type: String },
-      accountNo: { type: Number, default: 0 },
+      accountNo: {
+        type: String,
+        unique: true,
+      },
       bank: { type: String },
     },
     // user password updates
@@ -104,25 +110,37 @@ userSchema.pre("save", async function (next) {
     this.password = await bcrypt.hash(this.password, salt);
   }
 
-  if (this.isModified("withdrawalPin")) {
-    const pinkSalt = await bcrypt.genSalt(12);
-    this.withdrawalPin = await bcrypt.hash(
-      String(this.withdrawalPin),
+  if (!this.bankDetails) {
+    this.bankDetails = {};
+  }
+
+  if (!this.bankDetails.accountNo) {
+    this.bankDetails.accountNo = Math.floor(
+      1000000000 + Math.random() * 9000000000
+    ).toString();
+  }
+
+  if (
+    this.isModified("withdrawalSettings.withdrawalPin") &&
+    this.withdrawalSettings.withdrawalPin
+  ) {
+    const pinkSalt = await bcrypt.genSalt(10);
+    this.withdrawalSettings.withdrawalPin = await bcrypt.hash(
+      this.withdrawalSettings.withdrawalPin,
       pinkSalt
     );
   }
   next();
 });
 
-userSchema.pre("save", function (next) {
-  if (!this.referralCode) {
-    this.referralCode = crypto.randomUUID().split("-")[0];
-  }
-  if (!this.affiliateLink) {
-    this.affiliateLink = `${Base_Url}register?ref=${this.referralCode}`;
-  }
-  next();
-});
+// userSchema.pre("save", function (next) {
+//   if (!this.bankDetails.accountNo) {
+//     this.bankDetails.accountNo = Math.floor(
+//       1000000000 + Math.random() * 9000000000
+//     ).toString();
+//   }
+//   next();
+// });
 
 const User = model("User", userSchema);
 

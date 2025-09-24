@@ -64,7 +64,7 @@ export const uploadFile = async (req, res) => {
     });
 
     res.json({
-      url: result.secure_url,
+      imageUrl: result.secure_url,
       public_id: result.public_id,
       width: result.width,
       height: result.height,

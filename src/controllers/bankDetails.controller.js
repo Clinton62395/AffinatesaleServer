@@ -5,18 +5,23 @@ export const bankDetails = async (req, res) => {
   try {
     const { userId } = req.user;
 
-    const { accountNo, bank, accountname } = req.body;
+    const data = req.body;
+    const requiredFields = ["accountNo", "country", "bank", "phoneNumber"];
 
-    if (!accountNo || !bank || !accountname) {
-      return res
-        .status(400)
-        .send({ success: false, message: "the fields are required" });
+    for (const field of requiredFields) {
+      if (!data[field]) {
+        return res
+          .status(400)
+          .send({ success: false, message: `${field} is required` });
+      }
     }
 
     const bankDatails = {
-      accountNo,
-      bank,
-      accountname,
+      accountNo: data.accountNo,
+      phoneNumber: data.phoneNumber,
+      bank: data.bank,
+      accountname: data.accountname,
+      country: data.country,
     };
 
     const userBankUpdate = await User.findByIdAndUpdate(
@@ -28,6 +33,7 @@ export const bankDetails = async (req, res) => {
         runValidators: true,
       }
     );
+
     if (!userBankUpdate) {
       return res
         .status(404)
@@ -103,24 +109,34 @@ export const passwordUdapte = async (req, res) => {
   }
 };
 
-// user withdrawal  Settings pin  controllers
+//initial user withdrawal  Settings pin  controllers
 
 export const createWithdrawalPin = async (req, res) => {
   try {
-    const { withdrawalPin } = req.body;
+    const { newPink, confirmPin } = req.body;
+    console.log("information from body==>", req.body);
+
+    console.log("information from body withdrawal==>", !!newPink);
+
     const { userId } = req.user;
 
-    if (!withdrawalPin) {
+    if (!newPink || !confirmPin) {
       return res
         .status(400)
-        .send({ success: false, message: "withdrawal pink is required" });
+        .send({ success: false, message: "❌withdrawal pink is required" });
     }
 
-    if (!/^\d{4}$/.test(withdrawalPin)) {
+    if (!/^\d{4}$/.test(newPink)) {
       return res.status(400).send({
         success: false,
         message: "your pink must be   4 digits  a number only",
       });
+    }
+
+    if (newPink !== confirmPin) {
+      return res
+        .status(400)
+        .send({ success: false, message: "pins do not match" });
     }
 
     const user = await User.findById(userId);
@@ -129,12 +145,18 @@ export const createWithdrawalPin = async (req, res) => {
         .status(404)
         .send({ success: false, message: "user not found" });
     }
+
+    if (!user.withdrawalSettings) {
+      user.withdrawalSettings = {};
+    }
+
     if (user.withdrawalSettings.withdrawalPin) {
       return res
         .status(400)
         .send({ success: false, message: "user already has a withdral pin" });
     }
 
+    user.withdrawalSettings.withdrawalPin = newPink;
     await user.save();
 
     res.status(200).send({
@@ -151,61 +173,71 @@ export const createWithdrawalPin = async (req, res) => {
 export const withdrawalPinUpdate = async (req, res) => {
   try {
     const { userId } = req.user;
-    const { withdrawalPin, newWithdrawalPin, newWithdrawalPinAgain } = req.body;
 
-    if (!withdrawalPin || !newWithdrawalPin || !newWithdrawalPinAgain) {
-      return res
-        .status(401)
-        .send({ success: false, message: "all fields are required" });
+    const data = req.body;
+
+    const requiredFields = ["withdrawalPin", "newWithdrawalPin", "confirmPin"];
+
+    for (const field of requiredFields) {
+      if (!data[field]) {
+        return res
+          .status(400)
+          .send({ success: false, message: `${field} is required` });
+      }
+
+      if (data[field].length !== 4) {
+        return res
+          .status(400)
+          .send({ success: false, message: `${field} must be 4 digits` });
+      }
     }
 
-    if (newWithdrawalPin !== newWithdrawalPinAgain) {
-      return res
-        .status(401)
-        .send({ success: false, message: "withMdrawals pin dot not match" });
-    }
-
-    if (!/^\d{4}$/.test(newWithdrawalPin)) {
+    if (data.newWithdrawalPin !== data.confirmPin) {
       return res.status(400).send({
         success: false,
-        message: "your withdrawal pin must be exactly 4 digits (numbers only)",
+        message: "New Pin and Confirm Pin do not match",
       });
     }
 
     const user = await User.findById(userId);
 
     if (!user) {
-      return res.status(404).send({
+      return res
+        .status(404)
+        .send({ success: false, message: "User not found" });
+    }
+
+    if (!user.withdrawalSettings) {
+      user.withdrawalSettings = {};
+    }
+
+    if (user.withdrawalSettings.withdrawalPin !== data.newWithdrawalPin) {
+      return res.status(400).send({
         success: false,
-        message: "user not found",
+        message: "Current Pin is incorrect",
       });
     }
 
-    if (!user.withdrawalSettings) user.withdrawalSettings = {};
-    if (user.withdrawalSettings.withdrawalPin) {
-      const isPinMatch = await bcrypt.compare(
-        withdrawalPin,
-        user.withdrawalSettings.withdrawalPin
-      );
-
-      if (!isPinMatch) {
-        return res.status(401).send({
-          success: false,
-          message: "Invalid withdrawal pin ",
-        });
-      }
+    const isPinkMatch = await bcrypt.compare(
+      data.withdrawalPin,
+      user.withdrawalSettings.withdrawalPin
+    );
+    if (!isPinkMatch) {
+      return res
+        .status(401)
+        .send({ success: false, message: "Invalid current withdrawal pin" });
     }
 
-
+    user.withdrawalSettings.withdrawalPin = data.newWithdrawalPin;
     await user.save();
-    res.status(200).send({
-      success: true,
-      message: "withdrawal pin updated successfuly",
-    });
+
+    res
+      .status(200)
+      .send({ success: true, message: "Withdrawal Pin updated successfully" });
   } catch (error) {
-    console.error("server error", error);
+    console.error("Error setting withdrawal pin:", error);
     return res
       .status(500)
-      .send({ success: false, message: "internal server error" });
+      .send({ success: false, message: "Internal Server Error" });
   }
 };
