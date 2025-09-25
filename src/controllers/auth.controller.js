@@ -5,16 +5,16 @@ import dotenv from "dotenv";
 import admin from "firebase-admin";
 import crypto from "crypto";
 
-import serviceAccount from "../config/serviceAccountKey.json" with { type: "json" };
-import { refreshToken } from "firebase-admin/app";
+dotenv.config();
+
+// firebase admin init
+
+const serviceAccount = JSON.parse(process.env.GOOGLE_SERVICE_ACCOUNT_KEY);
 if (!admin.apps.length) {
   admin.initializeApp({
     credential: admin.credential.cert(serviceAccount),
   });
 }
-// prettier ignore
-
-dotenv.config();
 
 // social login facebook and google through firebase google
 
@@ -27,6 +27,7 @@ export const socialRegister = async (req, res) => {
         .status(400)
         .send({ success: false, message: "authorization token is required" });
     }
+
     const idToken = token.split(" ")[1];
     const decodedToken = await admin.auth().verifyIdToken(idToken);
     const { uid, name, email, picture } = decodedToken;
