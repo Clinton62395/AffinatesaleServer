@@ -90,7 +90,6 @@ export const socialRegister = async (req, res) => {
 
 // Register controller
 export const register = async (req, res) => {
-  const FRONTEND_URL = process.env.FORM_URL;
   try {
     const data = req.body;
     console.log("data from user", data);
@@ -150,7 +149,9 @@ export const register = async (req, res) => {
     });
 
     // refferal link
-    newUser.affiliateLink = `${FRONTEND_URL}?ref=${newUser.referralCode}`;
+    const VARCEL_URL = process.env.VERCEL_URL;
+    const FRONTEND_URL = process.env.FRONTEND_URL || VARCEL_URL;
+    newUser.affiliateLink = `${FRONTEND_URL}auth/sign-up?ref=${newUser.referralCode}`;
 
     await newUser.save();
     // JWT token for the new user

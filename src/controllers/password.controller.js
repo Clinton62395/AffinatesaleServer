@@ -26,14 +26,16 @@ export const resetPassword = async (req, res) => {
     );
 
     // reset pssword token
+    const VARCEL_URL = process.env.VERCEL_URL;
+    const FRONTEND_URL = process.env.FRONTEND_URL || VARCEL_URL;
 
-    const resetLink = `http://localhost:5173/auth/reset-password?token=${resetToken}&id=${user._id}`;
+    const resetLink = `${FRONTEND_URL}auth/reset-password?token=${resetToken}&id=${user._id}`;
     await transporter.sendMail({
       from: '"Support App" <support@app.com>',
       to: email,
       subject: "Reset password",
       text: `click here to update your password: ${resetLink} /n Note, the reset password will be expired after 15 minutes.`,
-      html: `<p>click here to update your password: 
+      html: `<p>click here to update your passwod: 
               <a href="${resetLink}">Update password</a> <br/> Note the reset password will be expired after 15 minutes.</p>`,
     });
 

@@ -4,8 +4,8 @@ import express from "express";
 dotenv.config();
 
 const router = express.Router();
-
-const FRONTEND_URL = process.env.FORM_URL;
+const VARCEL_URL = process.env.VERCEL_URL;
+const FRONTEND_URL = process.env.FRONTEND_URL || VARCEL_URL;
 
 router.get("/", (req, res) => {
   try {
@@ -15,7 +15,7 @@ router.get("/", (req, res) => {
       return res.status(400).send({ message: "referralCode is missing" });
     }
 
-    const newRedirectLink = `${FRONTEND_URL}?ref=${referralCode}`;
+    const newRedirectLink = `${FRONTEND_URL}auth/sign-up?ref=${referralCode}`;
     res.redirect(301, newRedirectLink);
   } catch (error) {
     console.error("error when redirection", error);
