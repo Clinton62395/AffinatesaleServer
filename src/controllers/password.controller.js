@@ -29,7 +29,7 @@ export const resetPassword = async (req, res) => {
     const VARCEL_URL = process.env.VERCEL_URL;
     const FRONTEND_URL = process.env.FRONTEND_URL || VARCEL_URL;
 
-    const resetLink = `${FRONTEND_URL}auth/reset-password?token=${resetToken}&id=${user._id}`;
+    const resetLink = `${FRONTEND_URL}/auth/reset-password?token=${resetToken}&id=${user._id}`;
     await transporter.sendMail({
       from: '"Support App" <support@app.com>',
       to: email,

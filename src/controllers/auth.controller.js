@@ -151,7 +151,7 @@ export const register = async (req, res) => {
     // refferal link
     const VARCEL_URL = process.env.VERCEL_URL;
     const FRONTEND_URL = process.env.FRONTEND_URL || VARCEL_URL;
-    newUser.affiliateLink = `${FRONTEND_URL}auth/sign-up?ref=${newUser.referralCode}`;
+    newUser.affiliateLink = `${FRONTEND_URL}/auth/sign-up?ref=${newUser.referralCode}`;
 
     await newUser.save();
     // JWT token for the new user

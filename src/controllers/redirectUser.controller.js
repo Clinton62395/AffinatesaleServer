@@ -15,7 +15,7 @@ router.get("/", (req, res) => {
       return res.status(400).send({ message: "referralCode is missing" });
     }
 
-    const newRedirectLink = `${FRONTEND_URL}auth/sign-up?ref=${referralCode}`;
+    const newRedirectLink = `${FRONTEND_URL}/auth/sign-up?ref=${referralCode}`;
     res.redirect(301, newRedirectLink);
   } catch (error) {
     console.error("error when redirection", error);
